@@ -3,19 +3,30 @@
 #include <hilog/log.h>
 
 #include <string>
+#include <vector>
 
 #include "vm_host.h"
 
+#undef LOG_DOMAIN
+#undef LOG_TAG
+#define LOG_DOMAIN 0x3200
+#define LOG_TAG "DSHGoVM"
+
 namespace {
 
-constexpr const char *kTag = "DSHGoVM";
-
+// 取字符串参数：napi_get_value_string_utf8 需要可写的 char 缓冲，
+// 不能直接传 std::string::data()（C++11/14 下返回 const char*）。
 std::string ValueToString(napi_env env, napi_value value) {
   size_t len = 0;
-  napi_get_value_string_utf8(env, value, nullptr, 0, &len);
-  std::string out(len, '\0');
-  napi_get_value_string_utf8(env, value, out.data(), len + 1, &len);
-  return out;
+  if (napi_get_value_string_utf8(env, value, nullptr, 0, &len) != napi_ok || len == 0) {
+    return std::string();
+  }
+  std::vector<char> buffer(len + 1, '\0');
+  size_t written = 0;
+  if (napi_get_value_string_utf8(env, value, buffer.data(), buffer.size(), &written) != napi_ok) {
+    return std::string();
+  }
+  return std::string(buffer.data(), written);
 }
 
 napi_value MakeString(napi_env env, const std::string &text) {
@@ -47,15 +58,13 @@ napi_value VmStart(napi_env env, napi_callback_info info) {
   }
 
   std::string error = dshvm::backend_start(kernel, rootfs, port);
-  OH_LOG_Info(LOG_APP, "%{public}s vmStart -> %{public}s", kTag,
-              error.empty() ? "ok" : error.c_str());
+  OH_LOG_INFO(LOG_APP, "vmStart -> %{public}s", error.empty() ? "ok" : error.c_str());
   return MakeString(env, error);
 }
 
 napi_value VmStop(napi_env env, napi_callback_info info) {
   std::string error = dshvm::backend_stop();
-  OH_LOG_Info(LOG_APP, "%{public}s vmStop -> %{public}s", kTag,
-              error.empty() ? "ok" : error.c_str());
+  OH_LOG_INFO(LOG_APP, "vmStop -> %{public}s", error.empty() ? "ok" : error.c_str());
   return MakeString(env, error);
 }
 
@@ -65,27 +74,24 @@ napi_value VmStatus(napi_env env, napi_callback_info info) {
 
 napi_value Init(napi_env env, napi_value exports) {
   napi_property_descriptor desc[] = {
-      {"nativeVersion", nullptr, NativeVersion, nullptr, nullptr, nullptr,
-       napi_default, nullptr},
-      {"vmStart", nullptr, VmStart, nullptr, nullptr, nullptr, napi_default,
-       nullptr},
-      {"vmStop", nullptr, VmStop, nullptr, nullptr, nullptr, napi_default,
-       nullptr},
-      {"vmStatus", nullptr, VmStatus, nullptr, nullptr, nullptr, napi_default,
-       nullptr},
+      {"nativeVersion", nullptr, NativeVersion, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"vmStart", nullptr, VmStart, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"vmStop", nullptr, VmStop, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"vmStatus", nullptr, VmStatus, nullptr, nullptr, nullptr, napi_default, nullptr},
   };
   napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
   return exports;
 }
 
+// C++ 里用定位初始化，避免依赖 C++20 的指定初始化器
 napi_module g_module = {
-    .nm_version = 1,
-    .nm_flags = 0,
-    .nm_filename = nullptr,
-    .nm_register_func = Init,
-    .nm_modname = "entry",
-    .nm_priv = nullptr,
-    .reserved = {0},
+    1,        // nm_version
+    0,        // nm_flags
+    nullptr,  // nm_filename
+    Init,     // nm_register_func
+    "entry",  // nm_modname
+    nullptr,  // nm_priv
+    {0},      // reserved
 };
 
 }  // namespace
