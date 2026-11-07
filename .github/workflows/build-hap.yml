@@ -190,3 +190,39 @@ jobs:
           path: /tmp/build-*.log
           if-no-files-found: ignore
           retention-days: 7
+
+  release:
+    name: 发布到 Release（直链下载）
+    needs: build
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: hap-unsigned
+          path: dist
+
+      - name: 更新滚动 Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eux
+          TAG=local-latest
+          cat > /tmp/notes.md <<'EOF'
+          ## DSH Go 鸿蒙端 · 滚动构建
+
+          未签名 debug HAP，含本机引擎（dsh 核心树 + Node 运行时）。
+          侧载后需自行签名安装。
+
+          源码：https://github.com/ThreeBody6666/dsh-harmony
+          EOF
+          gh release delete "$TAG" --cleanup-tag --yes 2>/dev/null || true
+          gh release create "$TAG" \
+            --target "$GITHUB_SHA" \
+            --title "local-latest ($(date -u +%Y-%m-%d\ %H:%M) UTC)" \
+            --notes-file /tmp/notes.md \
+            --prerelease \
+            dist/*.hap
+          echo "::notice::下载直链：https://github.com/${{ github.repository }}/releases/download/$TAG/$(basename $(ls dist/*.hap))"
