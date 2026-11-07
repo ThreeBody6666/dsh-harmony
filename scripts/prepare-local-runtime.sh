@@ -63,7 +63,7 @@ PY
 import sys, zipfile, os, io
 hap, outdir = sys.argv[1], sys.argv[2]
 z = zipfile.ZipFile(hap)
-picked = [n for n in z.namelist() if '/libs/arm64-v8a/libnode.so' in n]
+picked = [n for n in z.namelist() if 'libs/arm64-v8a/libnode.so' in n]
 if not picked:
     raise SystemExit('HAP 里没有 libnode：' + ', '.join(n for n in z.namelist() if 'libnode' in n) or '无')
 for name in picked:
