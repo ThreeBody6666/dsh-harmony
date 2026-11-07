@@ -119,15 +119,21 @@ jobs:
       - name: 安装依赖
         run: ohpm install --all
 
-      - name: 构建 HAP（预算 modelVersion 后逐个试）
+      - name: 构建 HAP（对齐镜像 SDK，逐个试 modelVersion）
+        env:
+          SDK_VERSION: ${{ inputs.sdk || '26.0.0' }}
         run: |
           set -uo pipefail
-          CANDIDATES=("26.0.0" "6.0.0" "6.1.1" "5.0.0")
+          # 镜像带的是 API 26 的 SDK，工程里两处版本号都要对上：
+          #   build-profile.json5  -> compileSdkVersion / compatibleSdkVersion
+          #   hvigor-config.json5  -> modelVersion（与 oh-package.json5 同步）
+          python3 .github/scripts/patch-sdk.py build-profile.json5 \
+            --compile "$SDK_VERSION" --compatible "$SDK_VERSION"
+          CANDIDATES=("$SDK_VERSION" "6.1.1" "6.0.0")
           ok=0
           for v in "${CANDIDATES[@]}"; do
-            echo "::group::尝试 modelVersion=$v"
+            echo "::group::尝试 modelVersion=$v（SDK=$SDK_VERSION）"
             python3 .github/scripts/ci-prepare.py "$v"
-            python3 .github/scripts/patch-sdk.py build-profile.json5 --compile "$v" || true
             if hvigorw assembleHap --mode module -p product=default -p buildMode=debug \
                  --no-daemon --stacktrace 2>&1 | tee "/tmp/build-$v.log"; then
               echo "::endgroup::"
@@ -139,7 +145,7 @@ jobs:
             echo "::warning::modelVersion=$v 失败，换下一个"
           done
           if [ "$ok" -ne 1 ]; then
-            echo "::error::所有候选 modelVersion 都失败，见上方日志"
+            echo "::error::所有候选都失败，见上方日志"
             exit 1
           fi
 
