@@ -14,10 +14,13 @@ import {
   AddressRaw,
   DshEventRaw,
   EmptyRequest,
-  EmptyRequestBody,
   FollowArgs,
   HistoryArgs,
+  FollowRequest,
+  HistoryRequest,
   PromptArgs,
+  SessionCreateRequest,
+  TurnWindowRaw,
   PromptTextPart,
   RecordRaw,
   RpcErrorInfo,
@@ -46,6 +49,19 @@ function readSessionTitle(item: SessionSummaryRaw): string {
     return '';
   }
   return t as string;
+}
+
+/** 把 follow 的入参按目标类型逐层构造，避免无类型对象字面量。 */
+function buildFollowArgs(sessionId: string): FollowArgs {
+  const address: AddressRaw = { kind: 'session', sessionId: sessionId };
+  const turnWindow: TurnWindowRaw = { minMessages: 50, minTurns: 2 };
+  const request: FollowRequest = {
+    address: address,
+    assistantStream: true,
+    maxMessages: 500,
+    turnWindow: turnWindow
+  };
+  return { request: request };
 }
 
 export class SessionWatch implements MuxListener {
@@ -101,14 +117,7 @@ export class SessionWatch implements MuxListener {
       mux.close();
       return;
     }
-    const args: FollowArgs = {
-      request: {
-        address: { kind: 'session', sessionId: this.sessionId } as AddressRaw,
-        assistantStream: true,
-        maxMessages: 500,
-        turnWindow: { minMessages: 50, minTurns: 2 }
-      }
-    };
+    const args: FollowArgs = buildFollowArgs(this.sessionId);
     this.streamId = uuidV4();
     mux.open(this.streamId, 'session/follow', args);
     this.onStatus('');
@@ -135,14 +144,7 @@ export class SessionWatch implements MuxListener {
     this.retries = 0;
     if (this.mux !== null && this.streamId.length > 0) {
       // ready 之后重新开 follow（世代变了，旧流已失效）
-      const args: FollowArgs = {
-        request: {
-          address: { kind: 'session', sessionId: this.sessionId } as AddressRaw,
-          assistantStream: true,
-          maxMessages: 500,
-          turnWindow: { minMessages: 50, minTurns: 2 }
-        }
-      };
+      const args: FollowArgs = buildFollowArgs(this.sessionId);
       this.streamId = uuidV4();
       this.mux.open(this.streamId, 'session/follow', args);
     }
@@ -250,8 +252,8 @@ export class DshClient {
   }
 
   async createSession(): Promise<string> {
-    const emptyBody: EmptyRequestBody = {};
-    const args: SessionCreateArgs = { request: emptyBody };
+    const request: SessionCreateRequest = {};
+    const args: SessionCreateArgs = { request: request };
     const result = await this.conn.rpc('session/create', args);
     const rawValue: Object | undefined = result.value;
     if (rawValue === undefined) {
@@ -283,14 +285,14 @@ export class DshClient {
 
   /** 读一页更早的历史（向上翻页用）。 */
   async history(sessionId: string, throughSeq: number, beforeSeq: number): Promise<RecordRaw[]> {
-    const args: HistoryArgs = {
-      request: {
-        address: { kind: 'session', sessionId: sessionId } as AddressRaw,
-        throughSeq: throughSeq,
-        beforeSeq: beforeSeq,
-        maxMessages: 200
-      }
+    const address: AddressRaw = { kind: 'session', sessionId: sessionId };
+    const request: HistoryRequest = {
+      address: address,
+      throughSeq: throughSeq,
+      beforeSeq: beforeSeq,
+      maxMessages: 200
     };
+    const args: HistoryArgs = { request: request };
     const result = await this.conn.rpc('session/page', args);
     const rawValue: Object | undefined = result.value;
     if (rawValue === undefined) {
