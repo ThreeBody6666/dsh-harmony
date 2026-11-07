@@ -16,7 +16,7 @@
 
 import { webSocket } from '@kit.NetworkKit';
 import { BusinessError } from '@kit.BasicServicesKit';
-import { MuxFrameIn, RpcErrorInfo } from '../model/Types';
+import { EmptyArgs, MuxFrameIn, MuxFrameOut, MuxPayload, RpcErrorInfo } from '../model/Types';
 
 export interface MuxListener {
   onReady: (clientId: string) => void;
@@ -56,13 +56,16 @@ export class DshMux {
       let settled: boolean = false;
 
       ws.on('open', (err: BusinessError, value: Object) => {
-        // 世代建立：先开 $events，等 ready
-        this.sendRaw({
+        // 世代建立：先开 $events 流，等 ready
+        const emptyArgs: EmptyArgs = {};
+        const payload: MuxPayload = { args: emptyArgs };
+        const frame: MuxFrameOut = {
           type: 'open',
           streamId: EVENTS_STREAM,
           endpoint: '$events',
-          payload: { args: {} }
-        });
+          payload: payload
+        };
+        this.sendRaw(frame);
       });
 
       ws.on('message', (err: BusinessError, value: string | ArrayBuffer) => {
@@ -165,7 +168,7 @@ export class DshMux {
     }
   }
 
-  private sendRaw(frame: Object): void {
+  private sendRaw(frame: MuxFrameOut): void {
     if (this.ws === null || this.closed) {
       return;
     }
@@ -176,19 +179,22 @@ export class DshMux {
 
   /** 开一条逻辑流；payload 必须是 `{args: {...}}`。 */
   open(streamId: string, endpoint: string, args: Object): void {
-    this.sendRaw({
+    const payload: MuxPayload = { args: args };
+    const frame: MuxFrameOut = {
       type: 'open',
       streamId: streamId,
       endpoint: endpoint,
-      payload: { args: args }
-    });
+      payload: payload
+    };
+    this.sendRaw(frame);
   }
 
   cancel(streamId: string): void {
-    this.sendRaw({
+    const frame: MuxFrameOut = {
       type: 'cancel',
       streamId: streamId
-    });
+    };
+    this.sendRaw(frame);
   }
 
   close(): void {

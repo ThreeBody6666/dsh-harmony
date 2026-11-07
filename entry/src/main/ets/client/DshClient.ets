@@ -13,6 +13,8 @@ import { Transcript } from './Transcript';
 import {
   AddressRaw,
   DshEventRaw,
+  EmptyRequest,
+  EmptyRequestBody,
   FollowArgs,
   HistoryArgs,
   PromptArgs,
@@ -220,7 +222,8 @@ export class DshClient {
   }
 
   async listSessions(): Promise<SessionRow[]> {
-    const args: SessionListArgs = { _request: {} };
+    const emptyRequest: EmptyRequest = {};
+    const args: SessionListArgs = { _request: emptyRequest };
     const result = await this.conn.rpc('session/list', args);
     const rawValue: Object | undefined = result.value;
     if (rawValue === undefined) {
@@ -247,7 +250,8 @@ export class DshClient {
   }
 
   async createSession(): Promise<string> {
-    const args: SessionCreateArgs = { request: {} };
+    const emptyBody: EmptyRequestBody = {};
+    const args: SessionCreateArgs = { request: emptyBody };
     const result = await this.conn.rpc('session/create', args);
     const rawValue: Object | undefined = result.value;
     if (rawValue === undefined) {

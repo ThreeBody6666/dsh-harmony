@@ -43,11 +43,20 @@ export interface RpcEnvelopeIn {
 // Mux（WebSocket 多路流）
 // ---------------------------------------------------------------------------
 
+/** 空参数占位（ArkTS 不接受无类型对象字面量，必须给个具体类型）。 */
+export interface EmptyArgs {
+}
+
+/** 逻辑流的打开参数：`{args: {...}}`。 */
+export interface MuxPayload {
+  args: Object;
+}
+
 export interface MuxFrameOut {
   type: string;      // 'open' | 'item' | 'end' | 'cancel'
   streamId: string;
   endpoint?: string; // open 时必填
-  payload?: Object;  // open 时必填，形如 {args: {...}}
+  payload?: MuxPayload;  // open 时必填
   value?: Object;    // item 时必填
 }
 
@@ -187,11 +196,13 @@ export interface AddressRaw {
 }
 
 export interface EmptyRequest {
-  request: Object;
+}
+
+export interface EmptyRequestBody {
 }
 
 export interface SessionListArgs {
-  _request: Object;
+  _request: EmptyRequest;
 }
 
 export interface SessionCreateRequest {
