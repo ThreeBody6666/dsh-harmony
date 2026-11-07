@@ -75,3 +75,17 @@ CI 只负责证明「代码能编译」，签名这一步绕不开华为账号�
 | `api23` | 6.1.0.818 | API 23 |
 
 改 `.github/workflows/build-hap.yml` 里的 `env.CI_IMAGE`，或手动触发时传 `image` 输入。
+
+
+---
+
+## 附：首次云端编译踩过的坑（已修，留档）
+
+| 现象 | 原因 | 修法 |
+|---|---|---|
+| `Hvigor config file .../hvigor/hvigor-config.json5 does not exist` | 手写工程漏了 DevEco 自动生成的文件 | 补 `hvigor/hvigor-config.json5`，CI 里用 `ci-prepare.py` 按镜像版本生成 |
+| `00306042 Specification Limit Violation` | `compileSdkVersion` 写成数字 `12` | 必须写字符串：`"5.0.0(12)"`；API 26 写 `"26.0.0"` |
+| `Schema validate failed ... buildOption.nativeLib` | `abiFilters` 放错层 | 放进 `buildOption.externalNativeOptions.abiFilters` |
+| `no matching function for call to 'napi_get_value_string_utf8'` | 直接传 `std::string::data()`（C++11/14 返回 const char*） | 用 `std::vector<char>` 缓冲，CMake 里设 C++17 |
+| `use of undeclared identifier 'OH_LOG_Info'` | hilog 宏是大写 | `OH_LOG_INFO(LOG_APP, ...)`，并 `#define LOG_DOMAIN/LOG_TAG` |
+| `arkts-no-untyped-obj-literals` ×9 | 对象字面量直接当 `Object` 传 | 每个字面量都声明具体接口/类型，嵌套的也要逐层构造 |

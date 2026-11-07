@@ -114,7 +114,7 @@ dsh web --host 0.0.0.0 --port 3080 --trusted-host 192.168.1.10:3080
 | 引擎协议（登录、session/list、create、prompt、page、follow、流式增量） | ✅ 已实测 | 在本机起独立 `dsh web`，用 Node 复刻同一套帧格式跑通，见 `docs/PROTOCOL.md` |
 | 事件折叠逻辑（消息/思考/工具/去重） | ✅ 已实测 | 用真实 snapshot（349 条记录）+ 脚本化流式事件验证 |
 | 工程结构自检 | ✅ 通过 | `node tools/verify.mjs`：JSON5、import 解析、资源引用、页面登记、括号配平 |
-| ArkTS 编译 | ⏳ 交给云端 | 推 GitHub 后由 Actions 编译，日志回来再修；见 CLOUD-BUILD.md |
+| ArkTS 编译 | ✅ 云端通过 | GitHub Actions 实测编出 HAP（含 libentry.so 与 modules.abc），见 CLOUD-BUILD.md |
 | 真机运行 | ❌ 未验证 | 需要签名证书 |
 | 原生桥（桩） | ✅ 可构建 | 无 qemu 库时编桩，App 正常安装、按钮给出明确提示 |
 | 原生桥（qemu 真实现） | ⚠️ 待接线 | 入口符号需对着 qemu 分支确认一次，见 LOCAL-ENGINE.md |
