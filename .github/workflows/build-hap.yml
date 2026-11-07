@@ -123,6 +123,7 @@ jobs:
           SDK_VERSION: ${{ inputs.sdk || '26.0.0' }}
         run: |
           set -uo pipefail
+          rm -rf entry/build .hvigor entry/.cxx
           python3 .github/scripts/patch-sdk.py build-profile.json5 \
             --compile "$SDK_VERSION" --compatible "$SDK_VERSION"
           CANDIDATES=("$SDK_VERSION" "6.1.1" "6.0.0")

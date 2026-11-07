@@ -9,6 +9,9 @@ if len(sys.argv) < 2:
 z = zipfile.ZipFile(sys.argv[1])
 names = z.namelist()
 print('entries:', len(names))
+print('--- 最大的 6 个条目 ---')
+for info in sorted(z.infolist(), key=lambda i: i.file_size, reverse=True)[:6]:
+    print('   %-52s %8.1f MB' % (info.filename, info.file_size / 1048576))
 checks = [
     ('libnode', ['libnode']),
     ('core.zip', ['resfile/core.zip']),
