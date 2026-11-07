@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "vm_host.h"
+#include "dshhost.h"
 
 #undef LOG_DOMAIN
 #undef LOG_TAG
@@ -72,12 +73,50 @@ napi_value VmStatus(napi_env env, napi_callback_info info) {
   return MakeString(env, dshvm::backend_status());
 }
 
+// ---- 本机引擎（进程内 node） ----
+napi_value HostKind(napi_env env, napi_callback_info info) {
+  return MakeString(env, dshgo::host_kind());
+}
+
+napi_value HostStart(napi_env env, napi_callback_info info) {
+  size_t argc = 3;
+  napi_value argv[3] = {nullptr, nullptr, nullptr};
+  napi_get_cb_info(env, info, &argc, argv, nullptr, nullptr);
+  std::string coreDir;
+  std::string dataDir;
+  int32_t port = 3080;
+  if (argc >= 1 && argv[0] != nullptr) {
+    coreDir = ValueToString(env, argv[0]);
+  }
+  if (argc >= 2 && argv[1] != nullptr) {
+    dataDir = ValueToString(env, argv[1]);
+  }
+  if (argc >= 3 && argv[2] != nullptr) {
+    napi_get_value_int32(env, argv[2], &port);
+  }
+  std::string error = dshgo::host_start(coreDir, dataDir, port);
+  OH_LOG_INFO(LOG_APP, "hostStart -> %{public}s", error.empty() ? "ok" : error.c_str());
+  return MakeString(env, error);
+}
+
+napi_value HostStop(napi_env env, napi_callback_info info) {
+  return MakeString(env, dshgo::host_stop());
+}
+
+napi_value HostStatus(napi_env env, napi_callback_info info) {
+  return MakeString(env, dshgo::host_status());
+}
+
 napi_value Init(napi_env env, napi_value exports) {
   napi_property_descriptor desc[] = {
       {"nativeVersion", nullptr, NativeVersion, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"vmStart", nullptr, VmStart, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"vmStop", nullptr, VmStop, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"vmStatus", nullptr, VmStatus, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"hostKind", nullptr, HostKind, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"hostStart", nullptr, HostStart, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"hostStop", nullptr, HostStop, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"hostStatus", nullptr, HostStatus, nullptr, nullptr, nullptr, napi_default, nullptr},
   };
   napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
   return exports;

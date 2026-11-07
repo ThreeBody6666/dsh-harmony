@@ -1,11 +1,9 @@
 name: 云端编译 HAP
 
 # 目的：在 GitHub Actions 里用 HarmonyOS 命令行工具链编译本工程，
-# 产出未签名 HAP + 完整编译日志。不需要 DevEco Studio，也不需要本地 SDK。
+# 产出未签名 HAP（含本机引擎的 libnode 与 dsh 核心树）。不需要 DevEco Studio。
 #
-# 镜像说明：ghcr.io/dalongzhuazi/harmonyos-ci（MIT，公开可匿名拉取），
-# 把官方 command-line-tools 打成了 Docker 镜像。
-# 参考：https://github.com/DaLongZhuaZi/harmonyos-ci
+# 镜像：ghcr.io/dalongzhuazi/harmonyos-ci（MIT，公开可拉）
 
 on:
   push:
@@ -14,11 +12,11 @@ on:
   workflow_dispatch:
     inputs:
       image:
-        description: '覆盖镜像（默认 ghcr.io/dalongzhuazi/harmonyos-ci:api26r）'
+        description: '覆盖镜像'
         required: false
         default: ''
       sdk:
-        description: '镜像对应的 SDK 版本（仓库默认按 API 12 写，CI 需要改写成这个）'
+        description: '镜像对应 SDK 版本'
         required: false
         default: '26.0.0'
 
@@ -49,10 +47,9 @@ jobs:
         run: |
           if [ -f build-profile.json5 ] && [ -f oh-package.json5 ]; then
             echo "is_project=true" >> "$GITHUB_OUTPUT"
-            echo "OK: 检测到鸿蒙工程"
           else
             echo "is_project=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::缺少 build-profile.json5 / oh-package.json5，跳过构建"
+            echo "::notice::不是鸿蒙工程，跳过"
           fi
 
   prepare:
@@ -88,41 +85,14 @@ jobs:
           hvigorw --version || true
           ohpm -v || true
 
-      - name: 探测镜像里的 SDK 与模板
-        run: |
-          set -x
-          ls /opt/command-line-tools 2>/dev/null || true
-          ls /opt/command-line-tools/sdk 2>/dev/null || true
-          find /opt/command-line-tools -maxdepth 4 -name 'sdk' -type d 2>/dev/null | head -5
-          echo '--- 镜像里自带的 hvigor-config 模板（若有）---'
-          find / -name 'hvigor-config.json5' -not -path '/proc/*' 2>/dev/null | head -10
-          for f in $(find / -name 'hvigor-config.json5' -not -path '/proc/*' 2>/dev/null | head -3); do
-            echo "== $f"; cat "$f" | head -20
-          done
-
       - name: 剥离本机签名配置
         run: |
           if [ -f .github/scripts/strip_signing.py ]; then
             python3 .github/scripts/strip_signing.py build-profile.json5
           fi
 
-      - name: 缓存 hvigor 与 oh_modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            /root/.hvigor
-            **/oh_modules
-          key: hvigor-${{ runner.os }}-${{ hashFiles('**/oh-package-lock.json5') }}
-          restore-keys: |
-            hvigor-${{ runner.os }}-
-
       - name: 安装依赖
         run: ohpm install --all
-
-      - name: 准备本机运行时（libnode + dsh 核心树）
-        continue-on-error: true
-        run: |
-          bash scripts/prepare-local-runtime.sh
 
       - name: 缓存运行时物料
         uses: actions/cache@v4
@@ -130,16 +100,29 @@ jobs:
           path: |
             entry/libs
             entry/src/main/resources/resfile
+            entry/src/main/cpp/vendor/node
           key: local-runtime-${{ hashFiles('scripts/prepare-local-runtime.sh') }}
+
+      - name: 准备本机运行时（libnode + dsh 核心树）
+        run: bash scripts/prepare-local-runtime.sh
+
+      - name: 取 node 头文件（与 libnode 同版本）
+        run: |
+          set -eux
+          NODE_VER="24.2.0"
+          mkdir -p entry/src/main/cpp/vendor/node
+          if [ ! -f entry/src/main/cpp/vendor/node/include/node.h ]; then
+            curl -fsSL -o /tmp/node-headers.tar.gz \
+              "https://nodejs.org/dist/v${NODE_VER}/node-v${NODE_VER}-headers.tar.gz"
+            tar -xzf /tmp/node-headers.tar.gz -C entry/src/main/cpp/vendor/node --strip-components=1
+          fi
+          ls entry/src/main/cpp/vendor/node/include | head
 
       - name: 构建 HAP（对齐镜像 SDK，逐个试 modelVersion）
         env:
           SDK_VERSION: ${{ inputs.sdk || '26.0.0' }}
         run: |
           set -uo pipefail
-          # 镜像带的是 API 26 的 SDK，工程里两处版本号都要对上：
-          #   build-profile.json5  -> compileSdkVersion / compatibleSdkVersion
-          #   hvigor-config.json5  -> modelVersion（与 oh-package.json5 同步）
           python3 .github/scripts/patch-sdk.py build-profile.json5 \
             --compile "$SDK_VERSION" --compatible "$SDK_VERSION"
           CANDIDATES=("$SDK_VERSION" "6.1.1" "6.0.0")
@@ -155,11 +138,21 @@ jobs:
               break
             fi
             echo "::endgroup::"
-            echo "::warning::modelVersion=$v 失败，换下一个"
+            echo "::warning::modelVersion=$v 失败"
           done
           if [ "$ok" -ne 1 ]; then
-            echo "::error::所有候选都失败，见上方日志"
+            echo "::error::所有候选都失败"
             exit 1
+          fi
+
+      - name: 校验 HAP 里的运行时
+        if: always()
+        run: |
+          set -eux
+          HAP=$(find . -name '*.hap' -path '*/outputs/*' | head -1)
+          if [ -n "${HAP:-}" ]; then
+            ls -lh "$HAP"
+            python3 - "$HAP" scripts/list-hap.py
           fi
 
       - name: 收集并校验产物
@@ -172,7 +165,7 @@ jobs:
           shopt -s nullglob
           haps=(dist/*.hap)
           if [ ${#haps[@]} -eq 0 ]; then
-            echo "::error::没有产出 hap，看上面日志"
+            echo "::error::没有产出 hap"
             exit 1
           fi
           for h in "${haps[@]}"; do
@@ -183,12 +176,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: hap-unsigned
-          compression-level: 0
           path: dist/
           if-no-files-found: error
           retention-days: 14
+          compression-level: 0
 
-      - name: 失败时也把日志带出来
+      - name: 失败时带出日志
         if: failure()
         uses: actions/upload-artifact@v4
         with:
