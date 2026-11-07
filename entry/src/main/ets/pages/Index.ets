@@ -32,6 +32,7 @@ struct Index {
   @State currentId: string = '';
   // 断点：由根容器实际宽度算出，旋转/分屏都会跟着变
   @State widthVp: number = 0;
+  @State diagText: string = '';
   @State bp: string = Breakpoints.SM;
 
   private client: DshClient | null = null;
@@ -40,8 +41,6 @@ struct Index {
 
   aboutToAppear(): void {
     this.restore();
-    // dsh-go 的体验：打开就是本机引擎，不用先填地址
-    this.bootLocal();
   }
 
   /** 开机自启本机引擎；失败才回落到手填地址的连接页。 */
@@ -142,14 +141,18 @@ struct Index {
     this.status = '检查本机资源…';
     try {
       const context = getContext(this) as common.UIAbilityContext;
-      const engine = new LocalEngine(context);
+      const engine = new LocalEngine(context, (text: string) => {
+        this.status = text;
+      });
       this.localEngine = engine;
-      this.status = '启动虚拟机…';
       const info: LocalEngineInfo = await engine.start();
       this.status = '登录本机引擎…';
       await this.connectWith(info.baseUrl, info.token);
     } catch (e) {
       this.reportError(e);
+      if (this.localEngine !== null) {
+        this.diagText = this.localEngine.readDiagnostics();
+      }
     } finally {
       this.busy = false;
       this.status = '';
@@ -399,7 +402,7 @@ struct Index {
             this.connect();
           })
 
-        Button(this.busy ? '请稍候…' : '在本机启动引擎（VM）')
+        Button(this.busy ? (this.status.length > 0 ? this.status : '启动中…') : '启动本机引擎（Node 内置）')
           .width('100%')
           .height(44)
           .margin({ top: 10 })
@@ -644,6 +647,18 @@ struct Index {
         .padding({ left: Theme.pad, right: Theme.pad })
       }
       this.errorBar()
+      if (this.diagText.length > 0) {
+        Text(this.diagText)
+          .fontSize(10)
+          .fontColor(Theme.textFaint)
+          .width('100%')
+          .maxLines(6)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .padding({ left: Theme.pad, right: Theme.pad, bottom: 6 })
+          .onClick(() => {
+            this.diagText = '';
+          })
+      }
       this.messageList()
       this.composer()
     }
