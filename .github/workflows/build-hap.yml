@@ -119,6 +119,19 @@ jobs:
       - name: 安装依赖
         run: ohpm install --all
 
+      - name: 准备本机运行时（libnode + dsh 核心树）
+        continue-on-error: true
+        run: |
+          bash scripts/prepare-local-runtime.sh
+
+      - name: 缓存运行时物料
+        uses: actions/cache@v4
+        with:
+          path: |
+            entry/libs
+            entry/src/main/resources/resfile
+          key: local-runtime-${{ hashFiles('scripts/prepare-local-runtime.sh') }}
+
       - name: 构建 HAP（对齐镜像 SDK，逐个试 modelVersion）
         env:
           SDK_VERSION: ${{ inputs.sdk || '26.0.0' }}
@@ -170,6 +183,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: hap-unsigned
+          compression-level: 0
           path: dist/
           if-no-files-found: error
           retention-days: 14
