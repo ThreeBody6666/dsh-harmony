@@ -152,7 +152,7 @@ jobs:
           HAP=$(find . -name '*.hap' -path '*/outputs/*' | head -1)
           if [ -n "${HAP:-}" ]; then
             ls -lh "$HAP"
-            python3 - "$HAP" scripts/list-hap.py
+            python3 scripts/list-hap.py "$HAP"
           fi
 
       - name: 收集并校验产物
