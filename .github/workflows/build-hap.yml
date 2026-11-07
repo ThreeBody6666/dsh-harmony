@@ -88,6 +88,18 @@ jobs:
           hvigorw --version || true
           ohpm -v || true
 
+      - name: 探测镜像里的 SDK 与模板
+        run: |
+          set -x
+          ls /opt/command-line-tools 2>/dev/null || true
+          ls /opt/command-line-tools/sdk 2>/dev/null || true
+          find /opt/command-line-tools -maxdepth 4 -name 'sdk' -type d 2>/dev/null | head -5
+          echo '--- 镜像里自带的 hvigor-config 模板（若有）---'
+          find / -name 'hvigor-config.json5' -not -path '/proc/*' 2>/dev/null | head -10
+          for f in $(find / -name 'hvigor-config.json5' -not -path '/proc/*' 2>/dev/null | head -3); do
+            echo "== $f"; cat "$f" | head -20
+          done
+
       - name: 剥离本机签名配置
         run: |
           if [ -f .github/scripts/strip_signing.py ]; then
@@ -107,18 +119,29 @@ jobs:
       - name: 安装依赖
         run: ohpm install --all
 
-      - name: 构建 HAP（按仓库 SDK 版本先试一次）
-        id: first
-        continue-on-error: true
+      - name: 构建 HAP（预算 modelVersion 后逐个试）
         run: |
-          hvigorw assembleHap --mode module -p product=default -p buildMode=debug --no-daemon --stacktrace 2>&1 | tee /tmp/build-first.log
-
-      - name: 失败则改写 SDK 版本重试
-        if: steps.first.outcome == 'failure'
-        run: |
-          echo "::notice::首轮构建失败，把 SDK 版本改写成镜像对应版本后重试"
-          python3 .github/scripts/patch-sdk.py build-profile.json5 --compile "${{ inputs.sdk || '26.0.0' }}"
-          hvigorw assembleHap --mode module -p product=default -p buildMode=debug --no-daemon --stacktrace 2>&1 | tee /tmp/build-second.log
+          set -uo pipefail
+          CANDIDATES=("26.0.0" "6.0.0" "6.1.1" "5.0.0")
+          ok=0
+          for v in "${CANDIDATES[@]}"; do
+            echo "::group::尝试 modelVersion=$v"
+            python3 .github/scripts/ci-prepare.py "$v"
+            python3 .github/scripts/patch-sdk.py build-profile.json5 --compile "$v" || true
+            if hvigorw assembleHap --mode module -p product=default -p buildMode=debug \
+                 --no-daemon --stacktrace 2>&1 | tee "/tmp/build-$v.log"; then
+              echo "::endgroup::"
+              echo "::notice::构建成功，modelVersion=$v"
+              ok=1
+              break
+            fi
+            echo "::endgroup::"
+            echo "::warning::modelVersion=$v 失败，换下一个"
+          done
+          if [ "$ok" -ne 1 ]; then
+            echo "::error::所有候选 modelVersion 都失败，见上方日志"
+            exit 1
+          fi
 
       - name: 收集并校验产物
         run: |
@@ -150,8 +173,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-log
-          path: |
-            /tmp/build-first.log
-            /tmp/build-second.log
+          path: /tmp/build-*.log
           if-no-files-found: ignore
           retention-days: 7
