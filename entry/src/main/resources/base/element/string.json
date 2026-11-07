@@ -1,0 +1,7 @@
+{
+  "string": [
+    { "name": "module_desc", "value": "DSH Go 鸿蒙客户端" },
+    { "name": "EntryAbility_desc", "value": "DeepSeek Harness 鸿蒙客户端" },
+    { "name": "EntryAbility_label", "value": "DSH Go" }
+  ]
+}

@@ -1,0 +1,15 @@
+/build/
+/.hvigor/
+/.idea/
+/oh_modules/
+/entry/build/
+/entry/.preview/
+*.hap
+*.app
+local.properties
+
+# 大文件：本机引擎物料不入库，用 scripts/fetch-vm-assets.sh 拉取
+/entry/src/main/resources/rawfile/vm/*.qcow2
+/entry/src/main/resources/rawfile/vm/kernel_aarch64
+/entry/src/main/cpp/vendor/qemu/*.so
+/entry/src/main/cpp/vendor/qemu/*.zip

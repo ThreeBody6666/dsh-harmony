@@ -1,0 +1,11 @@
+{
+  "modelVersion": "5.0.0",
+  "name": "dsh-harmony",
+  "version": "1.0.0",
+  "description": "DSH Go for HarmonyOS NEXT — DeepSeek Harness 鸿蒙客户端",
+  "main": "",
+  "author": "dsh-go port",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {}
+}

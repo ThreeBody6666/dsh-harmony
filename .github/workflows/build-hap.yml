@@ -1,0 +1,157 @@
+name: 云端编译 HAP
+
+# 目的：在 GitHub Actions 里用 HarmonyOS 命令行工具链编译本工程，
+# 产出未签名 HAP + 完整编译日志。不需要 DevEco Studio，也不需要本地 SDK。
+#
+# 镜像说明：ghcr.io/dalongzhuazi/harmonyos-ci（MIT，公开可匿名拉取），
+# 把官方 command-line-tools 打成了 Docker 镜像。
+# 参考：https://github.com/DaLongZhuaZi/harmonyos-ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      image:
+        description: '覆盖镜像（默认 ghcr.io/dalongzhuazi/harmonyos-ci:api26r）'
+        required: false
+        default: ''
+      sdk:
+        description: '镜像对应的 SDK 版本（仓库默认按 API 12 写，CI 需要改写成这个）'
+        required: false
+        default: '26.0.0'
+
+concurrency:
+  group: build-hap-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CI_IMAGE: ghcr.io/dalongzhuazi/harmonyos-ci:api26r
+
+jobs:
+  guard:
+    name: 检查是否鸿蒙工程
+    runs-on: ubuntu-latest
+    outputs:
+      is_project: ${{ steps.check.outputs.is_project }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        run: |
+          if [ -f build-profile.json5 ] && [ -f oh-package.json5 ]; then
+            echo "is_project=true" >> "$GITHUB_OUTPUT"
+            echo "OK: 检测到鸿蒙工程"
+          else
+            echo "is_project=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::缺少 build-profile.json5 / oh-package.json5，跳过构建"
+          fi
+
+  prepare:
+    name: 解析镜像
+    needs: guard
+    if: needs.guard.outputs.is_project == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.img.outputs.image }}
+    steps:
+      - id: img
+        env:
+          INPUT_IMAGE: ${{ inputs.image }}
+          DEFAULT_IMAGE: ${{ env.CI_IMAGE }}
+        run: echo "image=${INPUT_IMAGE:-$DEFAULT_IMAGE}" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: 构建（debug / 未签名）
+    needs: prepare
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ needs.prepare.outputs.image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 打印工具链版本
+        run: |
+          set -x
+          node -v || true
+          hvigorw --version || true
+          ohpm -v || true
+
+      - name: 剥离本机签名配置
+        run: |
+          if [ -f .github/scripts/strip_signing.py ]; then
+            python3 .github/scripts/strip_signing.py build-profile.json5
+          fi
+
+      - name: 缓存 hvigor 与 oh_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            /root/.hvigor
+            **/oh_modules
+          key: hvigor-${{ runner.os }}-${{ hashFiles('**/oh-package-lock.json5') }}
+          restore-keys: |
+            hvigor-${{ runner.os }}-
+
+      - name: 安装依赖
+        run: ohpm install --all
+
+      - name: 构建 HAP（按仓库 SDK 版本先试一次）
+        id: first
+        continue-on-error: true
+        run: |
+          hvigorw assembleHap --mode module -p product=default -p buildMode=debug --no-daemon --stacktrace 2>&1 | tee /tmp/build-first.log
+
+      - name: 失败则改写 SDK 版本重试
+        if: steps.first.outcome == 'failure'
+        run: |
+          echo "::notice::首轮构建失败，把 SDK 版本改写成镜像对应版本后重试"
+          python3 .github/scripts/patch-sdk.py build-profile.json5 --compile "${{ inputs.sdk || '26.0.0' }}"
+          hvigorw assembleHap --mode module -p product=default -p buildMode=debug --no-daemon --stacktrace 2>&1 | tee /tmp/build-second.log
+
+      - name: 收集并校验产物
+        run: |
+          set -eu
+          mkdir -p dist
+          find . -type f -name '*.hap' -path '*/outputs/*' \
+            -not -path './oh_modules/*' -not -path './node_modules/*' \
+            -exec cp -v {} dist/ \;
+          shopt -s nullglob
+          haps=(dist/*.hap)
+          if [ ${#haps[@]} -eq 0 ]; then
+            echo "::error::没有产出 hap，看上面日志"
+            exit 1
+          fi
+          for h in "${haps[@]}"; do
+            echo "$h : $(stat -c%s "$h") bytes"
+          done
+
+      - name: 上传 HAP
+        uses: actions/upload-artifact@v4
+        with:
+          name: hap-unsigned
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: 失败时也把日志带出来
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: |
+            /tmp/build-first.log
+            /tmp/build-second.log
+          if-no-files-found: ignore
+          retention-days: 7
