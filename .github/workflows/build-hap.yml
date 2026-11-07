@@ -99,7 +99,7 @@ jobs:
         with:
           path: |
             entry/libs
-            entry/src/main/resources/resfile
+            entry/src/main/resources/rawfile
             entry/src/main/cpp/vendor/node
           key: local-runtime-${{ hashFiles('scripts/prepare-local-runtime.sh') }}
 

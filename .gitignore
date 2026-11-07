@@ -13,3 +13,8 @@ local.properties
 /entry/src/main/resources/rawfile/vm/kernel_aarch64
 /entry/src/main/cpp/vendor/qemu/*.so
 /entry/src/main/cpp/vendor/qemu/*.zip
+
+# 本机引擎物料（CI 里生成/下载，不入库）
+/entry/src/main/resources/rawfile/core.zip
+/entry/libs/
+/entry/src/main/cpp/vendor/node/

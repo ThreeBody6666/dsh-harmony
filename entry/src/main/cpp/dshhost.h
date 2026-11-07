@@ -10,7 +10,8 @@ namespace dshgo {
 std::string host_kind();
 
 // 在进程内加载核心树并起 dsh web；成功返回空串
-std::string host_start(const std::string &coreDir, const std::string &dataDir, int port);
+std::string host_start(const std::string &hookPath, const std::string &coreDir,
+                       const std::string &dataDir, int port);
 
 std::string host_stop();
 

@@ -40,6 +40,32 @@ struct Index {
 
   aboutToAppear(): void {
     this.restore();
+    // dsh-go 的体验：打开就是本机引擎，不用先填地址
+    this.bootLocal();
+  }
+
+  /** 开机自启本机引擎；失败才回落到手填地址的连接页。 */
+  private async bootLocal(): Promise<void> {
+    if (this.busy) {
+      return;
+    }
+    this.busy = true;
+    this.status = '启动本机引擎…';
+    try {
+      const context = getContext(this) as common.UIAbilityContext;
+      const engine = new LocalEngine(context);
+      this.localEngine = engine;
+      const info: LocalEngineInfo = await engine.start();
+      this.status = '登录本机引擎…';
+      await this.connectWith(info.baseUrl, info.token);
+    } catch (e) {
+      // 没有核心树/宿主未接入时，安静回落到连接页
+      const err = e as Error;
+      this.errorText = err.message;
+    } finally {
+      this.busy = false;
+      this.status = '';
+    }
   }
 
   aboutToDisappear(): void {

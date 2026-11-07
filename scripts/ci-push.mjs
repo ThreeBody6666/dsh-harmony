@@ -92,18 +92,12 @@ if (existing.status === 200) {
 }
 
 // 3) 推送
+// 注意：不要在 remote 配置里写 token（中断会残留）。这里用一次性 URL。
 const authUrl = repoUrl.replace('https://', `https://x-access-token:${token}@`);
-const remotes = git(['remote']).split('\n').filter(Boolean);
-if (remotes.includes('origin')) {
-  git(['remote', 'set-url', 'origin', authUrl]);
-} else {
-  git(['remote', 'add', 'origin', authUrl]);
-}
 const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']).trim();
 console.log(`→ 推送 ${branch} 到 ${owner}/${repoName} …`);
-git(['push', '-u', 'origin', branch, '--force'], { stdio: 'pipe' });
+git(['push', authUrl, `${branch}:${branch}`], { stdio: 'pipe' });
 const sha = git(['rev-parse', 'HEAD']).trim();
-git(['remote', 'set-url', 'origin', repoUrl]); // 推完把 token 从 remote 里抹掉
 console.log(`✓ 推送完成 ${sha.slice(0, 7)}`);
 
 // 4) 等构建

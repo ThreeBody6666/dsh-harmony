@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "dshhost.h"
@@ -31,7 +32,8 @@ std::string host_kind() {
 #endif
 }
 
-std::string host_start(const std::string &coreDir, const std::string &dataDir, int port) {
+std::string host_start(const std::string &hookPath, const std::string &coreDir,
+                       const std::string &dataDir, int port) {
 #if defined(DSHGO_WITH_NODE)
   if (coreDir.empty()) {
     g_status = "error:no-core";
@@ -43,7 +45,9 @@ std::string host_start(const std::string &coreDir, const std::string &dataDir, i
     return "找不到核心入口：" + entry;
   }
 
-  // 进程内起 node：等价于 node <entry> web --host 127.0.0.1 --port <port> --no-open
+  // 进程内起 node：等价于
+  //   NODE_OPTIONS="--import <hook>" node <core>/bin.js web --host 127.0.0.1 --port <port> --no-open
+  // 钩子负责把 stdout 落盘，宿主从日志里捞启动 token。
   static std::vector<std::string> store;
   store.clear();
   store.push_back("dsh");
@@ -55,18 +59,28 @@ std::string host_start(const std::string &coreDir, const std::string &dataDir, i
   store.push_back(std::to_string(port));
   store.push_back("--no-open");
 
-  setenv("DSH_HOME", dataDir.c_str(), 1);
+  setenv("DSH_HOME", (dataDir + "/dshhome").c_str(), 1);
   setenv("HOME", dataDir.c_str(), 1);
   setenv("NODE_PATH", (coreDir + "/node_modules").c_str(), 1);
+  if (!hookPath.empty()) {
+    setenv("NODE_OPTIONS", ("--import " + hookPath).c_str(), 1);
+  }
 
   std::vector<char *> argv;
   for (std::string &item : store) {
     argv.push_back(const_cast<char *>(item.c_str()));
   }
   argv.push_back(nullptr);
+  (void) hookPath;
 
   g_status = "running";
-  int rc = node::Start(static_cast<int>(argv.size()) - 1, argv.data());
+  // node 自己会跑事件循环，必须放到独立线程，否则会堵住 NAPI 调用线程
+  int rc = 0;
+  std::thread loop([&]() {
+    rc = node::Start(static_cast<int>(argv.size()) - 1, argv.data());
+  });
+  loop.detach();
+  return "";
   g_status = "stopped";
   return rc == 0 ? "" : ("node 退出码 " + std::to_string(rc));
 #else

@@ -16,7 +16,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LIBS_DIR="$ROOT/entry/libs/arm64-v8a"
-RESFILE_DIR="$ROOT/entry/src/main/resources/resfile"
+RESFILE_DIR="$ROOT/entry/src/main/resources/rawfile"
 WORK="$(mktemp -d)"
 
 # 与 dsh 版本对齐：核心树用哪个版本，就钉这个版本

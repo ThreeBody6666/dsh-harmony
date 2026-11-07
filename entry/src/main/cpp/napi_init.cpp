@@ -79,22 +79,26 @@ napi_value HostKind(napi_env env, napi_callback_info info) {
 }
 
 napi_value HostStart(napi_env env, napi_callback_info info) {
-  size_t argc = 3;
-  napi_value argv[3] = {nullptr, nullptr, nullptr};
+  size_t argc = 4;
+  napi_value argv[4] = {nullptr, nullptr, nullptr, nullptr};
   napi_get_cb_info(env, info, &argc, argv, nullptr, nullptr);
+  std::string hookPath;
   std::string coreDir;
   std::string dataDir;
   int32_t port = 3080;
   if (argc >= 1 && argv[0] != nullptr) {
-    coreDir = ValueToString(env, argv[0]);
+    hookPath = ValueToString(env, argv[0]);
   }
   if (argc >= 2 && argv[1] != nullptr) {
-    dataDir = ValueToString(env, argv[1]);
+    coreDir = ValueToString(env, argv[1]);
   }
   if (argc >= 3 && argv[2] != nullptr) {
-    napi_get_value_int32(env, argv[2], &port);
+    dataDir = ValueToString(env, argv[2]);
   }
-  std::string error = dshgo::host_start(coreDir, dataDir, port);
+  if (argc >= 4 && argv[3] != nullptr) {
+    napi_get_value_int32(env, argv[3], &port);
+  }
+  std::string error = dshgo::host_start(hookPath, coreDir, dataDir, port);
   OH_LOG_INFO(LOG_APP, "hostStart -> %{public}s", error.empty() ? "ok" : error.c_str());
   return MakeString(env, error);
 }
