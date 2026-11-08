@@ -355,6 +355,19 @@ struct Index {
         .fontColor(Theme.textDim)
         .margin({ bottom: 26 })
 
+      this.errorBar()
+      if (this.diagText.length > 0) {
+        Text(this.diagText)
+          .fontSize(10)
+          .fontColor(Theme.textFaint)
+          .width('100%')
+          .margin({ bottom: 10 })
+          .maxLines(10)
+          .padding(8)
+          .backgroundColor(Theme.bgElevated)
+          .borderRadius(8)
+      }
+
       Column() {
         Text('引擎地址')
           .fontSize(Theme.fontSmall)

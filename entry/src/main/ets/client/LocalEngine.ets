@@ -120,12 +120,16 @@ export class LocalEngine {
     }
   }
 
-  /** 有没有把核心树打进来。 */
+  /** 有没有把核心树打进来。只看 fd，不读 158MB 内容。 */
   async hasCore(): Promise<boolean> {
     try {
-      const data: Uint8Array = await this.context.resourceManager.getRawFileContent(CORE_ZIP);
-      return data !== undefined && data.length > 0;
+      const raw = await this.context.resourceManager.getRawFd(CORE_ZIP);
+      const ok: boolean = raw !== undefined && raw.length > 0;
+      await this.context.resourceManager.closeRawFd(CORE_ZIP);
+      this.step('检测到 core.zip，大小 ' + (ok ? raw.length : 0) + ' 字节');
+      return ok;
     } catch (e) {
+      this.step('检测 core.zip 失败：' + (e as Error).message);
       return false;
     }
   }
