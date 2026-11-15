@@ -75,7 +75,10 @@ export class DshConnection {
     const client = http.createHttp();
     const reply = new HttpReply();
     const headers: Record<string, string> = {
-      'Accept': 'text/html,application/json'
+      'Accept': 'text/html,application/json',
+      // 引擎用 Host 头推出 authority，再与 cookie 里记录的绑定值比对；
+      // 不显式指定时 http 模块发出的 Host 未必是 127.0.0.1:3080，会直接被判 401/400。
+      'Host': this.authority
     };
     if (this.cookie.length > 0) {
       headers['Cookie'] = this.cookie;
@@ -148,6 +151,8 @@ export class DshConnection {
     const headers: Record<string, string> = {
       'content-type': 'application/json',
       'accept': 'application/json',
+      // 同 get()：RPC 也走 authority 绑定的 cookie，Host 必须一致
+      'Host': this.authority,
       'Cookie': this.cookie
     };
     try {
