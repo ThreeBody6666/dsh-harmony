@@ -7,6 +7,7 @@ import fs from '@ohos.file.fs';
 import zlib from '@ohos.zlib';
 import { common } from '@kit.AbilityKit';
 import util from '@ohos.util';
+import { hilog } from '@kit.PerformanceAnalysisKit';
 
 export class SelfTestItem {
   name: string = '';
@@ -123,13 +124,18 @@ export class SelfTest {
         return;
       }
       const stat = fs.statSync(path);
-      const readLen: number = Math.min(stat.size, 1200);
+      const readLen: number = Math.min(stat.size, 8000);
       const buf = new ArrayBuffer(readLen);
       const f = fs.openSync(path, fs.OpenMode.READ_ONLY);
       fs.readSync(f.fd, buf, { offset: stat.size - readLen, length: readLen });
       fs.closeSync(f);
       const text: string = new util.TextDecoder('utf-8').decodeToString(new Uint8Array(buf));
-      const tailText: string = text.split('\n').filter((l: string) => l.trim().length > 0).slice(-6).join(' | ');
+      const lines: string[] = text.split('\n').filter((l: string) => l.trim().length > 0);
+      // 同时打到 hilog：界面放不下的部分用 hdc 读
+      lines.slice(-24).forEach((l: string, i: number) => {
+        hilog.info(0x3200, 'DSHGO-NODELOG', 'L%{public}d %{public}s', i, l.slice(0, 300));
+      });
+      const tailText: string = lines.slice(-12).join(' ⏎ ');
       this.add('Node 输出日志', stat.size > 0, tailText.length > 0 ? tailText : '(空)');
     } catch (e) {
       this.add('Node 输出日志', false, (e as Error).message);
