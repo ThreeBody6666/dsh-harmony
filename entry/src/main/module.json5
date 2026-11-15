@@ -28,7 +28,10 @@
     ],
     "requestPermissions": [
       { "name": "ohos.permission.INTERNET" },
-      { "name": "ohos.permission.GET_NETWORK_INFO" }
+      { "name": "ohos.permission.GET_NETWORK_INFO" },
+      // V8 在非 --jitless 模式要为 JIT/WebAssembly 申请可写可执行内存；
+      // 不声明这条，node::Start 会在初始化阶段被系统拦下（abort）。
+      { "name": "ohos.permission.ALLOW_WRITABLE_CODE_MEMORY" }
     ]
   }
 }

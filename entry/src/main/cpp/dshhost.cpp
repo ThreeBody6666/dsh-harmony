@@ -8,7 +8,12 @@
 //   所以这里只做一件事：dladdr 找到自己所在目录 → dlopen libnode.so.<N> (RTLD_GLOBAL)
 //   → dlsym 取 mangled 的 node::Start。不引用任何 node:: / v8:: 类型。
 //
-// 必须带 --jitless：本应用不申请 ALLOW_WRITABLE_CODE_MEMORY，V8 申请可写可执行内存会被拦。
+// 关于 --jitless：**不再传**。
+//   传了 --jitless ⇒ WebAssembly 不可用 ⇒ Node 内建 undici 一加载就抛
+//   "WebAssembly is not defined" 直接 abort；而用 DSHM 的 undici 纯 JS 垫片顶替，
+//   又会让登录请求被兜底成 HTTP 400（本机二分实测）。
+//   不传 ⇒ WASM 可用、undici 正常、登录 303 + cookie。代价是要申请可写可执行内存
+//   （module.json5 的 requestPermissions 里已声明 ALLOW_WRITABLE_CODE_MEMORY）。
 #include <dlfcn.h>
 #include <unistd.h>
 
@@ -109,11 +114,10 @@ std::string host_start(const std::string &hookPath, const std::string &coreDir,
   g_nodeStarted = true;
 
   // 等价于：
-  //   NODE_OPTIONS="--import <hook>" node --jitless <core>/bin.js web --host 127.0.0.1 --port <port> --no-open
+  //   NODE_OPTIONS="--import <hook>" node <core>/bin.js web --host 127.0.0.1 --port <port> --no-open
   static std::vector<std::string> store;
   store.clear();
   store.push_back("dsh");
-  store.push_back("--jitless");          // 不申请可写可执行内存
   store.push_back("--expose-internals");  // 兼容层要访问 BuiltinModule（内建 undici 拦截）
   store.push_back(entry);
   store.push_back("web");
