@@ -107,7 +107,8 @@ std::string host_start(const std::string &hookPath, const std::string &coreDir,
   static std::vector<std::string> store;
   store.clear();
   store.push_back("dsh");
-  store.push_back("--jitless");  // 见文件头：不申请可写可执行内存
+  store.push_back("--jitless");          // 不申请可写可执行内存
+  store.push_back("--expose-internals");  // 兼容层要访问 BuiltinModule（内建 undici 拦截）
   store.push_back(entry);
   store.push_back("web");
   store.push_back("--host");
@@ -120,6 +121,11 @@ std::string host_start(const std::string &hookPath, const std::string &coreDir,
   setenv("HOME", dataDir.c_str(), 1);
   setenv("NODE_PATH", (coreDir + "/node_modules").c_str(), 1);
   setenv("TMPDIR", (dataDir + "/tmp").c_str(), 1);
+  // 原生插件（sharp/pty/koffi 等）要在应用自己的 libs 目录里找鸿蒙版 .node
+  const std::string nativeLibs = libs_dir();
+  if (!nativeLibs.empty()) {
+    setenv("DSHGO_NATIVE_LIBS", nativeLibs.c_str(), 1);
+  }
   if (!hookPath.empty()) {
     setenv("NODE_OPTIONS", ("--import " + hookPath).c_str(), 1);
   }

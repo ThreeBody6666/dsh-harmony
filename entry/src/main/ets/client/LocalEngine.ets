@@ -19,6 +19,13 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 const TAG: string = 'LocalEngine';
 const CORE_ZIP: string = 'core.zip';
 const HOOK_ASSET: string = 'hook.mjs';
+// 鸿蒙端兼容层（照 DSHM 的 jitless-env 移植）：必须在 dsh 入口之前装好
+const COMPAT_ASSETS: string[] = [
+  'jitless-env.cjs',
+  'require-builtin-shim.cjs',
+  'internal-undici-shim.cjs',
+  'fetch-shim.js'
+];
 const ENGINE_PORT: number = 3080;
 const TOKEN_WAIT_MS: number = 120000;
 
@@ -178,6 +185,16 @@ export class LocalEngine {
     this.step('开始准备本机引擎');
     if (!fs.accessSync(this.baseDir)) {
       fs.mkdirSync(this.baseDir, true);
+    }
+    const compatDir: string = this.baseDir + '/compat';
+    if (!fs.accessSync(compatDir)) {
+      fs.mkdirSync(compatDir, true);
+    }
+    for (const name of COMPAT_ASSETS) {
+      const dest: string = compatDir + '/' + name;
+      if (!fs.accessSync(dest)) {
+        await this.extractRaw('compat/' + name, dest);
+      }
     }
     if (!fs.accessSync(this.hookPath)) {
       this.onProgress('释放 hook.mjs');
