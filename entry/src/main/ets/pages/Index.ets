@@ -43,6 +43,19 @@ struct Index {
   private localEngine: LocalEngine | null = null;
 
   aboutToAppear(): void {
+    // 命令行驱动：aa start 带 autotest/autohost 时自动执行，便于无人值守调试
+    if (AppStorage.get<boolean>('autoTest') === true) {
+      AppStorage.setOrCreate('autoTest', false);
+      setTimeout(() => {
+        this.runSelfTest();
+      }, 1200);
+    }
+    if (AppStorage.get<boolean>('autoHost') === true) {
+      AppStorage.setOrCreate('autoHost', false);
+      setTimeout(() => {
+        this.startLocal();
+      }, 2500);
+    }
     this.restore();
   }
 

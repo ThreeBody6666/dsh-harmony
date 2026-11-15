@@ -13,6 +13,10 @@ const TAG: string = 'DSHGo';
 export default class EntryAbility extends UIAbility {
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     hilog.info(0x0000, TAG, 'onCreate');
+    // 调试通道：用 `hdc shell aa start ... --ps autotest 1` 启动时自动跑自检，
+    // `--ps autohost 1` 时自动启动本机引擎。没有人手点也能验证。
+    AppStorage.setOrCreate('autoTest', String(want.parameters?.autotest ?? '') === '1');
+    AppStorage.setOrCreate('autoHost', String(want.parameters?.autohost ?? '') === '1');
     Store.init(this.context).catch((e: BusinessError) => {
       hilog.warn(0x0000, TAG, 'preferences init failed: %{public}s', e.message);
     });
