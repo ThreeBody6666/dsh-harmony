@@ -37,12 +37,8 @@ if(QEMU_LIBS)
 endif()
 
 # ---------------------------------------------------------------- 进程内 node
-if(EXISTS ${NODE_INC}/node.h AND NODE_LIB)
-  message(STATUS "dsh-go: node headers + libnode found, enabling in-process node")
-  include_directories(${NODE_INC})
-  list(GET NODE_LIB 0 NODE_LIB_FIRST)
-  target_link_libraries(entry PUBLIC ${NODE_LIB_FIRST})
-  target_compile_definitions(entry PRIVATE DSHGO_WITH_NODE=1)
-else()
-  message(STATUS "dsh-go: no node runtime yet, host falls back to stub")
-endif()
+# 不再链接 libnode、也不需要 node.h：
+# 运行时在本 .so 同目录 dlopen libnode.so.137/127 并 dlsym node::Start。
+# 这样构建期不依赖 Node 头文件（Node 26 的 v8.h 需要 C++20 <source_location>，
+# OHOS libc++ 没有），也不会因为「头文件没配好」悄悄降级成桩实现。
+target_link_libraries(entry PUBLIC dl)
