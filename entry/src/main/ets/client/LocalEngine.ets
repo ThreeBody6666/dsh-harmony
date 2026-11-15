@@ -226,6 +226,17 @@ export class LocalEngine {
     await this.prepare();
 
     const cwd: string = this.context.filesDir;
+    // 清掉上一轮的日志：engine.log 是追加写的，留着旧 token 会让本轮抓到过期的那条（踩过 400）
+    for (const stale of ['/engine.log', '/node-output.log']) {
+      try {
+        const p: string = cwd + stale;
+        if (fs.accessSync(p)) {
+          fs.unlinkSync(p);
+        }
+      } catch (e) {
+        this.step('清理旧日志失败：' + (e as BusinessError).message);
+      }
+    }
     this.onProgress('启动 Node 宿主…');
     this.step('调用 hostStart，coreDir=' + this.coreDir);
     let error: string = '';
