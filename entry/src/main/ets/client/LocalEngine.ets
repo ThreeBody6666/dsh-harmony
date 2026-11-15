@@ -190,13 +190,12 @@ export class LocalEngine {
     if (!fs.accessSync(compatDir)) {
       fs.mkdirSync(compatDir, true);
     }
+    // 兼容层与钩子随包升级：每次都重写，避免设备上留着旧版本（踩过一次）
     for (const name of COMPAT_ASSETS) {
       const dest: string = compatDir + '/' + name;
-      if (!fs.accessSync(dest)) {
-        await this.extractRaw('compat/' + name, dest);
-      }
+      await this.extractRaw('compat/' + name, dest);
     }
-    if (!fs.accessSync(this.hookPath)) {
+    {
       this.onProgress('释放 hook.mjs');
       await this.extractRaw(HOOK_ASSET, this.hookPath);
       this.step('hook.mjs 就位');
