@@ -6,6 +6,7 @@ import vmhost from 'libentry.so';
 import fs from '@ohos.file.fs';
 import zlib from '@ohos.zlib';
 import { common } from '@kit.AbilityKit';
+import util from '@ohos.util';
 
 export class SelfTestItem {
   name: string = '';
@@ -44,6 +45,7 @@ export class SelfTest {
     await this.checkFileIo();
     await this.checkUnzip();
     await this.checkHostStart();
+    await this.checkNodeLog();
     return this.out;
   }
 
@@ -109,6 +111,28 @@ export class SelfTest {
       this.add('zip 解压（zlib）', ok, ok ? '解出 hello.txt' : '解压完成但没找到文件');
     } catch (e) {
       this.add('zip 解压（zlib）', false, (e as Error).message);
+    }
+  }
+
+  /** 读宿主抓下来的 Node 输出（stdout+stderr），启动失败的真正原因在这里。 */
+  private async checkNodeLog(): Promise<void> {
+    const path: string = this.ctx.filesDir + '/node-output.log';
+    try {
+      if (!fs.accessSync(path)) {
+        this.add('Node 输出日志', false, '还没有 node-output.log（没启动过宿主）');
+        return;
+      }
+      const stat = fs.statSync(path);
+      const readLen: number = Math.min(stat.size, 1200);
+      const buf = new ArrayBuffer(readLen);
+      const f = fs.openSync(path, fs.OpenMode.READ_ONLY);
+      fs.readSync(f.fd, buf, { offset: stat.size - readLen, length: readLen });
+      fs.closeSync(f);
+      const text: string = new util.TextDecoder('utf-8').decodeToString(new Uint8Array(buf));
+      const tailText: string = text.split('\n').filter((l: string) => l.trim().length > 0).slice(-6).join(' | ');
+      this.add('Node 输出日志', stat.size > 0, tailText.length > 0 ? tailText : '(空)');
+    } catch (e) {
+      this.add('Node 输出日志', false, (e as Error).message);
     }
   }
 

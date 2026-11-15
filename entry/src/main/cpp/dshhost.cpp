@@ -12,6 +12,8 @@
 #include <dlfcn.h>
 #include <unistd.h>
 
+#include <cstdio>
+
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
@@ -128,8 +130,15 @@ std::string host_start(const std::string &hookPath, const std::string &coreDir,
   argv.push_back(nullptr);
 
   g_status = "running";
+  // 把 Node 的 stdout/stderr 抓进文件：应用进程的 stdout 在设备上看不见，
+  // 而 node::Start 失败时原因全打在 stdout/stderr 上（DSHM 同款做法）。
+  const std::string nodeLog = dataDir + "/node-output.log";
   // node::Start 会阻塞并自己跑事件循环，必须离开 NAPI 调用线程
-  std::thread loop([]() {
+  std::thread loop([nodeLog]() {
+    if (FILE *f = ::freopen(nodeLog.c_str(), "w", stdout)) {
+      ::setvbuf(f, nullptr, _IOLBF, 0);
+      ::dup2(::fileno(f), 2);
+    }
     const int argc = static_cast<int>(store.size());
     const int rc = g_nodeStart(argc, argv.data());
     g_status = rc == 0 ? "exited" : ("error:exit-" + std::to_string(rc));
