@@ -11,6 +11,7 @@
 
 import vmhost from 'libentry.so';
 import fs from '@ohos.file.fs';
+import util from '@ohos.util';
 import zlib from '@ohos.zlib';
 import { common } from '@kit.AbilityKit';
 import { BusinessError } from '@kit.BasicServicesKit';
@@ -99,11 +100,8 @@ export class LocalEngine {
       const f = fs.openSync(path, fs.OpenMode.READ_ONLY);
       fs.readSync(f.fd, buf, { offset: size - take });
       fs.closeSync(f);
-      const arr = new Uint8Array(buf);
-      let text = '';
-      for (let i = 0; i < arr.length; i++) {
-        text += String.fromCharCode(arr[i]);
-      }
+      // 必须按 UTF-8 解码：逐字节 fromCharCode 会把中文变成乱码
+      const text: string = util.TextDecoder.create('utf-8').decodeToString(new Uint8Array(buf));
       return text;
     } catch (e) {
       return '(读取失败)';

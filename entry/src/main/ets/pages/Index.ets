@@ -82,8 +82,22 @@ struct Index {
       const engine = new LocalEngine(context);
       this.localEngine = engine;
       const info: LocalEngineInfo = await engine.start();
-      this.status = '登录本机引擎…';
-      await this.connectWith(info.baseUrl, info.token);
+      // 引擎打印 token 时端口可能还没 bind 完，直接登录会被拒（2300007），这里退避重试
+      let lastErr: Error | null = null;
+      for (let attempt = 1; attempt <= 8; attempt++) {
+        this.status = attempt === 1 ? '登录本机引擎…' : `登录本机引擎…（第 ${attempt} 次）`;
+        try {
+          await this.connectWith(info.baseUrl, info.token);
+          lastErr = null;
+          break;
+        } catch (e) {
+          lastErr = e as Error;
+          await new Promise<void>((resolve) => setTimeout(() => resolve(), 1500));
+        }
+      }
+      if (lastErr !== null) {
+        throw lastErr;
+      }
     } catch (e) {
       // 没有核心树/宿主未接入时，安静回落到连接页
       const err = e as Error;
@@ -173,8 +187,22 @@ struct Index {
       });
       this.localEngine = engine;
       const info: LocalEngineInfo = await engine.start();
-      this.status = '登录本机引擎…';
-      await this.connectWith(info.baseUrl, info.token);
+      // 引擎打印 token 时端口可能还没 bind 完，直接登录会被拒（2300007），这里退避重试
+      let lastErr: Error | null = null;
+      for (let attempt = 1; attempt <= 8; attempt++) {
+        this.status = attempt === 1 ? '登录本机引擎…' : `登录本机引擎…（第 ${attempt} 次）`;
+        try {
+          await this.connectWith(info.baseUrl, info.token);
+          lastErr = null;
+          break;
+        } catch (e) {
+          lastErr = e as Error;
+          await new Promise<void>((resolve) => setTimeout(() => resolve(), 1500));
+        }
+      }
+      if (lastErr !== null) {
+        throw lastErr;
+      }
     } catch (e) {
       this.reportError(e);
       if (this.localEngine !== null) {
