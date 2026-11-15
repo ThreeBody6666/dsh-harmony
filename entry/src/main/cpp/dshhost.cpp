@@ -41,6 +41,8 @@ std::mutex g_mutex;
 std::string g_status = "idle";
 void *g_libnode = nullptr;
 NodeStartFn g_nodeStart = nullptr;
+// 同一进程里 node::Start 只能调用一次：第二次会让 V8 重复初始化并直接 abort（真机实测闪退）
+bool g_nodeStarted = false;
 
 std::string libs_dir() {
   Dl_info info;
@@ -98,9 +100,11 @@ std::string host_start(const std::string &hookPath, const std::string &coreDir,
     g_status = "error:no-entry";
     return "找不到核心入口：" + entry;
   }
-  if (g_status == "running") {
+  if (g_nodeStarted) {
+    // 已经起过了：直接返回，让调用方去等 token，不要再起一次
     return "";
   }
+  g_nodeStarted = true;
 
   // 等价于：
   //   NODE_OPTIONS="--import <hook>" node --jitless <core>/bin.js web --host 127.0.0.1 --port <port> --no-open

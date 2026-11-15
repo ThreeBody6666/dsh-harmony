@@ -237,6 +237,16 @@ export class LocalEngine {
         this.step('清理旧日志失败：' + (e as BusinessError).message);
       }
     }
+    // 宿主在本进程里只能起一次：已经起来就直接等 token（重复启动会让 V8 重复初始化而闪退）
+    const already: string = vmhost.hostStatus();
+    if (already === 'running') {
+      this.step('宿主已在运行，跳过重复启动');
+      const ready: string = await this.waitForToken();
+      const info0 = new LocalEngineInfo();
+      info0.baseUrl = `http://127.0.0.1:${ENGINE_PORT}`;
+      info0.token = ready;
+      return info0;
+    }
     this.onProgress('启动 Node 宿主…');
     this.step('调用 hostStart，coreDir=' + this.coreDir);
     let error: string = '';
