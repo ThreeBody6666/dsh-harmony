@@ -14,6 +14,8 @@
 
 #include <cstdio>
 
+#include <sys/stat.h>
+
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
@@ -124,7 +126,10 @@ std::string host_start(const std::string &hookPath, const std::string &coreDir,
   setenv("DSH_HOME", (dataDir + "/dshhome").c_str(), 1);
   setenv("HOME", dataDir.c_str(), 1);
   setenv("NODE_PATH", (coreDir + "/node_modules").c_str(), 1);
-  setenv("TMPDIR", (dataDir + "/tmp").c_str(), 1);
+  // TMPDIR 必须真实存在：dsh 的 spill-local 会 mkdtemp 到这里，
+  // 目录缺失会让插件初始化失败 → 所有 HTTP 请求被兜底成 400（真机踩过）
+  const std::string tmpDir = dataDir + "/tmp";
+  ::mkdir(tmpDir.c_str(), 0700);
   // 原生插件（sharp/pty/koffi 等）要在应用自己的 libs 目录里找鸿蒙版 .node
   const std::string nativeLibs = libs_dir();
   if (!nativeLibs.empty()) {

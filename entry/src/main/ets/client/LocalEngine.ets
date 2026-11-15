@@ -245,6 +245,15 @@ export class LocalEngine {
       info0.token = ready;
       return info0;
     }
+    // 引擎（spill-local 等插件）会往 TMPDIR 里 mkdtemp；目录不在就会初始化失败
+    try {
+      const tmpDir: string = cwd + '/tmp';
+      if (!fs.accessSync(tmpDir)) {
+        fs.mkdirSync(tmpDir, true);
+      }
+    } catch (e) {
+      this.step('创建 tmp 目录失败：' + (e as BusinessError).message);
+    }
     this.onProgress('启动 Node 宿主…');
     this.step('调用 hostStart，coreDir=' + this.coreDir);
     let error: string = '';
