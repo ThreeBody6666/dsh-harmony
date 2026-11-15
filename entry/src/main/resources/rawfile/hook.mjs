@@ -50,7 +50,11 @@ try {
   if (typeof env.installRequireBuiltinShim === 'function') {
     env.installRequireBuiltinShim(log);
   }
-  if (typeof env.installInternalUndiciShim === 'function') {
+  // 内建 undici 拦截（DSHM 用来救 MessagePort/inspector）在我们的链路上会让
+  // 登录请求被兜底成 HTTP 400（本机实测：只装它 → 400，不装 → 303 + cookie）。
+  // 我们不用 inspector，缺了它不影响 dsh web，所以默认关闭；
+  // 需要时设 DSHGO_UNDICI_SHIM=1 再开。
+  if (process.env.DSHGO_UNDICI_SHIM === '1' && typeof env.installInternalUndiciShim === 'function') {
     env.installInternalUndiciShim(log);
   }
   if (typeof env.installJitlessFetch === 'function') {
