@@ -11,6 +11,7 @@ import { Theme, timeLabel } from '../ui/Theme';
 import { Store } from '../ui/Storage';
 import { Breakpoints, lengthToVp } from '../ui/Responsive';
 import { DshClient, SessionWatch } from '../client/DshClient';
+import { SelfTest, SelfTestItem } from '../client/SelfTest';
 import { LocalEngine, LocalEngineError, LocalEngineInfo } from '../client/LocalEngine';
 import { ChatItem, SessionRow } from '../model/Types';
 import { DshError } from '../net/Connection';
@@ -33,6 +34,8 @@ struct Index {
   // 断点：由根容器实际宽度算出，旋转/分屏都会跟着变
   @State widthVp: number = 0;
   @State diagText: string = '';
+  @State testItems: SelfTestItem[] = [];
+  @State testing: boolean = false;
   @State bp: string = Breakpoints.SM;
 
   private client: DshClient | null = null;
@@ -235,6 +238,24 @@ struct Index {
     await watch.start();
   }
 
+  /** 跑一遍本机引擎依赖的每一层，把结果摊在屏幕上。 */
+  private async runSelfTest(): Promise<void> {
+    if (this.testing) {
+      return;
+    }
+    this.testing = true;
+    this.errorText = '';
+    try {
+      const context = getContext(this) as common.UIAbilityContext;
+      const test = new SelfTest(context);
+      this.testItems = await test.run();
+    } catch (e) {
+      this.errorText = (e as Error).message;
+    } finally {
+      this.testing = false;
+    }
+  }
+
   private async send(): Promise<void> {
     const text: string = this.draft.trim();
     if (text.length === 0 || this.client === null || this.currentId.length === 0) {
@@ -415,6 +436,18 @@ struct Index {
             this.connect();
           })
 
+        Button(this.testing ? '自检中…' : '自检（诊断本机引擎）')
+          .width('100%')
+          .height(42)
+          .margin({ top: 10 })
+          .backgroundColor(Theme.accentSoft)
+          .fontColor(Theme.text)
+          .borderRadius(12)
+          .enabled(!this.testing)
+          .onClick(() => {
+            this.runSelfTest();
+          })
+
         Button(this.busy ? (this.status.length > 0 ? this.status : '启动中…') : '启动本机引擎（Node 内置）')
           .width('100%')
           .height(44)
@@ -428,6 +461,38 @@ struct Index {
           })
       }
       .width('100%')
+
+      if (this.testItems.length > 0) {
+        Column() {
+          ForEach(this.testItems, (item: SelfTestItem) => {
+            Row() {
+              Text(item.ok ? '✅' : '❌')
+                .fontSize(14)
+                .width(24)
+              Column() {
+                Text(item.name)
+                  .fontSize(13)
+                  .fontColor(Theme.text)
+                  .width('100%')
+                Text(item.detail)
+                  .fontSize(11)
+                  .fontColor(Theme.textFaint)
+                  .width('100%')
+                  .maxLines(3)
+              }
+              .layoutWeight(1)
+            }
+            .width('100%')
+            .alignItems(VerticalAlign.Top)
+            .padding({ top: 6, bottom: 6 })
+          }, (item: SelfTestItem) => item.name + (item.ok ? '1' : '0') + item.detail)
+        }
+        .width('100%')
+        .padding(12)
+        .backgroundColor(Theme.card)
+        .borderRadius(10)
+        .margin({ top: 16 })
+      }
 
       Column() {
         Text('本机模式 = 设备里跑一台 Linux 虚拟机，VM 内启动 dsh web；\n需先把 kernel/镜像打进包里（见 docs/LOCAL-ENGINE.md）。')
