@@ -24,6 +24,21 @@ try {
   fs.mkdirSync(home, { recursive: true });
 } catch {}
 
+// 同时把 stdout/stderr 落到 engine.log：ArkTS 侧靠它捞启动 token
+const logPath = path.join(home, 'engine.log');
+try {
+  fs.appendFileSync(logPath, `[hook] pid=${process.pid}\n`);
+} catch {}
+const writeBoth = (writer) => (...args) => {
+  try {
+    const chunk = args[0];
+    fs.appendFileSync(logPath, typeof chunk === 'string' ? chunk : Buffer.from(chunk));
+  } catch {}
+  return writer(...args);
+};
+process.stdout.write = writeBoth(process.stdout.write.bind(process.stdout));
+process.stderr.write = writeBoth(process.stderr.write.bind(process.stderr));
+
 log('pid=' + process.pid + ' exposeInternals=' + process.execArgv.join(','));
 
 try {
