@@ -21,6 +21,8 @@
 #include <thread>
 #include <vector>
 
+#include <hilog/log.h>
+
 #include "dshhost.h"
 
 namespace dshgo {
@@ -134,6 +136,41 @@ std::string host_start(const std::string &hookPath, const std::string &coreDir,
   // 而 node::Start 失败时原因全打在 stdout/stderr 上（DSHM 同款做法）。
   const std::string nodeLog = dataDir + "/node-output.log";
   // node::Start 会阻塞并自己跑事件循环，必须离开 NAPI 调用线程
+  // tail 线程：把 node-output.log 的新行镜像到 hilog，方便用 hdc 直接看全量
+  std::thread tail([nodeLog]() {
+    long offset = 0;
+    std::string carry;
+    for (;;) {
+      FILE *rf = ::fopen(nodeLog.c_str(), "r");
+      if (rf != nullptr) {
+        ::fseek(rf, offset, SEEK_SET);
+        char buf[1024];
+        size_t n = ::fread(buf, 1, sizeof(buf) - 1, rf);
+        if (n > 0) {
+          buf[n] = '\0';
+          offset += static_cast<long>(n);
+          carry += buf;
+          size_t pos = 0;
+          for (;;) {
+            const size_t nl = carry.find('\n', pos);
+            if (nl == std::string::npos) {
+              carry = carry.substr(pos);
+              break;
+            }
+            const std::string line = carry.substr(pos, nl - pos);
+            if (!line.empty()) {
+              OH_LOG_Print(LOG_APP, LOG_INFO, kLogDomain, kLogTag, "NODE %{public}s", line.c_str());
+            }
+            pos = nl + 1;
+          }
+        }
+        ::fclose(rf);
+      }
+      ::usleep(500 * 1000);
+    }
+  });
+  tail.detach();
+
   std::thread loop([nodeLog]() {
     if (FILE *f = ::freopen(nodeLog.c_str(), "w", stdout)) {
       ::setvbuf(f, nullptr, _IOLBF, 0);
