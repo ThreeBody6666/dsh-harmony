@@ -22,6 +22,17 @@ export default class EntryAbility extends UIAbility {
     });
   }
 
+  /**
+   * 热启动（应用已在运行）时也要能接受命令行指令：
+   *   hdc shell aa start -b com.dshgo.app -a EntryAbility --ps autohost 1
+   * onCreate 只在冷启动走，所以这里必须再处理一次。
+   */
+  onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam): void {
+    hilog.info(0x0000, TAG, 'onNewWant');
+    AppStorage.setOrCreate('autoTest', String(want.parameters?.autotest ?? '') === '1');
+    AppStorage.setOrCreate('autoHost', String(want.parameters?.autohost ?? '') === '1');
+  }
+
   onWindowStageCreate(windowStage: window.WindowStage): void {
     windowStage.loadContent('pages/Index', (err: BusinessError) => {
       if (err.code !== 0) {

@@ -56,6 +56,17 @@ struct Index {
         this.startLocal();
       }, 2500);
     }
+    // 热启动来的指令：轮询 AppStorage（onNewWant 不重建页面）
+    setInterval(() => {
+      if (AppStorage.get<boolean>('autoTest') === true) {
+        AppStorage.setOrCreate('autoTest', false);
+        this.runSelfTest();
+      }
+      if (AppStorage.get<boolean>('autoHost') === true) {
+        AppStorage.setOrCreate('autoHost', false);
+        this.startLocal();
+      }
+    }, 1000);
     this.restore();
   }
 
