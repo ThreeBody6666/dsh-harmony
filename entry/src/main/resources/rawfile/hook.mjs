@@ -50,11 +50,13 @@ try {
   if (typeof env.installRequireBuiltinShim === 'function') {
     env.installRequireBuiltinShim(log);
   }
-  // 内建 undici 拦截（DSHM 用来救 MessagePort/inspector）在我们的链路上会让
-  // 登录请求被兜底成 HTTP 400（本机实测：只装它 → 400，不装 → 303 + cookie）。
-  // 我们不用 inspector，缺了它不影响 dsh web，所以默认关闭；
-  // 需要时设 DSHGO_UNDICI_SHIM=1 再开。
-  if (process.env.DSHGO_UNDICI_SHIM === '1' && typeof env.installInternalUndiciShim === 'function') {
+  // 内建 undici 拦截：--jitless 下必须装，否则 Node 内建 undici 一加载就抛
+  // "WebAssembly is not defined" 直接 abort。
+  // 【曾经的 400 根因】垫片自造 Headers/Request/Response 类，而 dsh 的 HTTP 层
+  // 用 `headers instanceof Headers` 做身份判断 → 类型对不上 → handler 抛错 →
+  // 被 webserver 兜底成 HTTP 400（日志里看不到异常）。已在
+  // internal-undici-shim.cjs 里改为「有原生类就用原生类」，登录恢复 303 + cookie。
+  if (typeof env.installInternalUndiciShim === 'function') {
     env.installInternalUndiciShim(log);
   }
   if (typeof env.installJitlessFetch === 'function') {

@@ -167,12 +167,19 @@ module.exports = {
   /* 导出面等价（对比端侧 libnode.so.137 的导出块）：ErrorEvent 内置无人取用，仅为面等价 */
   ErrorEvent,
 
-  /* Web 平台其余接口：复用 fetch-shim.js 的实现，保证与全局垫片同一套语义 */
+  /* Web 平台其余接口。
+   * 【必须复用原生类】dsh 的 HTTP 层会做 `headers instanceof Headers`、
+   * `new Request(...)` 这类身份判断；若这里换成自造的 Dshm* 类，
+   * instanceof 一律为 false → handler 抛错 → 被 webserver 兜底成 HTTP 400
+   * （本机实测：登录 400、日志里看不到异常）。原生 Headers/Request/Response
+   * 在 Node 24 里是独立实现，只用到它们时并不依赖 WASM；真正依赖 WASM 的
+   * 是 undici 的 llhttp 解析器（只有 fetch 走它）。
+   * 因此：有原生类就用原生类，没有才回落到垫片实现。 */
   fetch: dshmFetch,
-  Headers: DshmHeaders,
-  Request: DshmRequest,
-  Response: DshmResponse,
-  FormData: DshmFormData,
+  Headers: typeof globalThis.Headers === 'function' ? globalThis.Headers : DshmHeaders,
+  Request: typeof globalThis.Request === 'function' ? globalThis.Request : DshmRequest,
+  Response: typeof globalThis.Response === 'function' ? globalThis.Response : DshmResponse,
+  FormData: typeof globalThis.FormData === 'function' ? globalThis.FormData : DshmFormData,
   Blob: DshmBlob,
   File: DshmFile,
 
