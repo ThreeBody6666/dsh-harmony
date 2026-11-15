@@ -120,7 +120,8 @@ std::string host_start(const std::string &hookPath, const std::string &coreDir,
     setenv("NODE_OPTIONS", ("--import " + hookPath).c_str(), 1);
   }
 
-  std::vector<char *> argv;
+  static std::vector<char *> argv;
+  argv.clear();
   for (std::string &item : store) {
     argv.push_back(const_cast<char *>(item.c_str()));
   }
